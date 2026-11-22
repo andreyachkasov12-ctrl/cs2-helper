@@ -22,25 +22,27 @@
 4. Сложи все mp4 в одну папку и запусти: `cs2-helper join папка_с_mp4`. Получится `highlights.mp4` с плавными переходами.
 
 Нужен ffmpeg (ffmpeg.org) в PATH только для склейки.
+# CS2 Helper
 
-## Как получить exe через GitHub (ничего ставить не нужно)
+A single program (one .exe file) that processes CS2 demo files to provide:
 
-1. Зарегистрируйся на github.com и нажми **New repository** (имя любое, например `cs2-helper`).
-2. Нажми **uploading an existing file** и перетащи **всё содержимое папки проекта**, включая скрытую папку `.github`. Если её не видно, включи показ скрытых файлов.
-3. Открой вкладку **Actions** → workflow **build** → **Run workflow**.
-4. Через несколько минут открой завершённый запуск → внизу **Artifacts** → скачай `cs2-helper-windows` (внутри `cs2-helper.exe`).
-5. Чтобы exe лежал на странице Releases со ссылкой для друзей: создай релиз с тегом `v0.2.0` (Releases → Create a new release), сборка запустится сама.
+- **Error analysis**: deaths without a trade, opening deaths, flashes that hit teammates or yourself, and a map-based visualization of where you died.
+- **Grenade analysis**: a breakdown of every grenade you threw, including its landing spot and the specific `setpos`/`setang` commands needed to replicate your exact position.
+- **Kill highlights**: automatic detection of 2K/3K/4K/ACE sequences; it generates a `.cfg` file for each clip and uses FFmpeg to stitch the recorded clips together into a single video.
 
-## Как собрать у себя
+The output is an HTML report that opens automatically in your web browser.
 
-1. Поставь Rust: rustup.rs (на Windows согласись установить Visual Studio Build Tools).
-2. В папке проекта: `cargo build --release`.
-3. Файл: `target\release\cs2-helper.exe`.
+## How to use (once you have the .exe)
 
-## Важно
+1. Download a demo: CS2 → "Watch" → "Your Matches" → "Download". If the file is in `.bz2` format, extract it.
+2. Drag and drop the `.dem` file onto `cs2-helper.exe`.
+3. Enter your player number from the list provided. A folder named `…_analysis` (or similar) will appear next to the demo file, containing `report.html` and a `clips` folder.
 
-Код не компилировался и не проверялся на реальной демке. Самое хрупкое место: `src/parse.rs`, функция `read_raw` (вызов парсера demoparser). Если сборка падает, скопируй текст ошибки: чаще всего правится только эта функция.
+## How to record clips
 
-Не проверено и стоит перепроверить на практике:
-- команды `demo_gototick` и `spec_player_by_accountid` в текущей версии CS2;
-- имена полей событий (`user_team_num`, `user_X` и т.д.), в разных версиях парсера могут называться иначе.
+1. Open the demo in CS2 and start recording in OBS.
+2. In the CS2 console, type: `exec clip_01_3K_R5` (use the filename found in the `clips` folder; place the `.cfg` file in your `game/csgo/cfg` directory).
+3. Stop the recording once the duration specified in `clips.txt` has elapsed. Repeat this process for the other clips.
+4. Place all the resulting `.mp4` files into a single folder and run: `cs2-helper join folder_with_mp4s`. This will generate a `highlights.mp4` file with smooth transitions.
+
+FFmpeg (from ffmpeg.org) must be in your system PATH to use the video-stitching feature.
