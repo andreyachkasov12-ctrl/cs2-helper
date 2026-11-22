@@ -1,0 +1,17 @@
+[package]
+name = "cs2-helper"
+version = "0.2.0"
+edition = "2021"
+
+[dependencies]
+# Парсер демок CS2 (LaihoE/demoparser). API может отличаться по версиям,
+# вся работа с ним изолирована в src/parse.rs
+parser = { git = "https://github.com/LaihoE/demoparser", package = "parser" }
+ahash = "0.8"
+anyhow = "1"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
