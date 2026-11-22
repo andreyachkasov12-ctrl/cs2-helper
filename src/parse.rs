@@ -69,7 +69,7 @@ fn read_raw(bytes: &[u8]) -> Result<Vec<RawEvent>> {
         .map(|s| s.to_string())
         .collect();
 
-     use parser::first_pass::parser_settings::create_huffman_lookup_table;
+     use parser::second_pass::parser_settings::create_huffman_lookup_table;
     let huf = create_huffman_lookup_table();
 
     let settings = ParserInputs {
