@@ -69,6 +69,9 @@ fn read_raw(bytes: &[u8]) -> Result<Vec<RawEvent>> {
         .map(|s| s.to_string())
         .collect();
 
+     use parser::first_pass::parser_settings::create_huffman_lookup_table;
+    let huf = create_huffman_lookup_table();
+
     let settings = ParserInputs {
         real_name_to_og_name: AHashMap::default(),
         wanted_players: vec![],
@@ -76,15 +79,18 @@ fn read_raw(bytes: &[u8]) -> Result<Vec<RawEvent>> {
         wanted_other_props: vec![],
         wanted_prop_states: AHashMap::default(),
         wanted_events: events,
+        wanted_ticks: vec![],
         parse_ents: true,
         parse_projectiles: false,
+        parse_grenades: false,
+        parse_weapons: false,
+        vector_props_as_lists: false,
         only_header: false,
-        count_props: false,
         only_convars: false,
         order_by_steamid: false,
         list_props: false,
         fallback_bytes: None,
-        ..Default::default()
+        huffman_lookup_table: &huf,
     };
 
     let mut p = Parser::new(settings, ParsingMode::ForceSingleThreaded);
