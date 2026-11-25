@@ -40,6 +40,9 @@ pub struct Throw {
     pub pitch: f32,
     pub yaw: f32,
     pub land: Option<(f32, f32, f32)>,
+    /// Флаги игрока в момент броска (бит 0 = стоит на земле, бит 1 = присед).
+    /// None, если парсер их не отдал.
+    pub flags: Option<i64>,
 }
 
 #[derive(Default, Debug)]

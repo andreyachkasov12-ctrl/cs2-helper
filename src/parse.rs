@@ -24,6 +24,17 @@ impl RawEvent {
         v.parse::<i64>()
             .unwrap_or_else(|_| v.parse::<f64>().map(|x| x as i64).unwrap_or(0))
     }
+    /// Число или None, если поля нет или оно пустое.
+    fn oi(&self, key: &str) -> Option<i64> {
+        let v = self.s(key);
+        if v.is_empty() {
+            None
+        } else {
+            v.parse::<i64>()
+                .ok()
+                .or_else(|| v.parse::<f64>().ok().map(|x| x as i64))
+        }
+    }
     fn b(&self, key: &str) -> bool {
         self.s(key) == "true"
     }
@@ -38,10 +49,12 @@ fn clean(debug: String) -> String {
 }
 
 // ============================================================================
-// Работа с парсером. Сначала пробуем со свойствами игроков (команда, позиция,
-// углы), если не получилось, повторяем без них.
+// Работа с парсером. Три попытки, от самой полной к самой простой:
+//   0: события + команда, позиция, углы, флаги игрока
+//   1: события + команда, позиция, углы
+//   2: только события
 // ============================================================================
-fn read_raw_inner(bytes: &[u8], with_props: bool) -> Result<Vec<RawEvent>> {
+fn read_raw_inner(bytes: &[u8], tier: u8) -> Result<Vec<RawEvent>> {
     use ahash::AHashMap;
     use parser::first_pass::parser_settings::ParserInputs;
     use parser::parse_demo::{Parser, ParsingMode};
@@ -63,22 +76,24 @@ fn read_raw_inner(bytes: &[u8], with_props: bool) -> Result<Vec<RawEvent>> {
     .collect();
 
     // (короткое имя, внутреннее имя в игре)
-    let prop_names = [
-        ("team_num", "m_iTeamNum"),
-        ("X", "CBodyComponent.m_skeletonInstance.m_vecX"),
-        ("Y", "CBodyComponent.m_skeletonInstance.m_vecY"),
-        ("Z", "CBodyComponent.m_skeletonInstance.m_vecZ"),
-        ("pitch", "m_angEyeAngles[0]"),
-        ("yaw", "m_angEyeAngles[1]"),
-    ];
+    let mut prop_names: Vec<(&str, &str)> = Vec::new();
+    if tier <= 1 {
+        prop_names.push(("team_num", "m_iTeamNum"));
+        prop_names.push(("X", "CBodyComponent.m_skeletonInstance.m_vecX"));
+        prop_names.push(("Y", "CBodyComponent.m_skeletonInstance.m_vecY"));
+        prop_names.push(("Z", "CBodyComponent.m_skeletonInstance.m_vecZ"));
+        prop_names.push(("pitch", "m_angEyeAngles[0]"));
+        prop_names.push(("yaw", "m_angEyeAngles[1]"));
+    }
+    if tier == 0 {
+        prop_names.push(("flags", "m_fFlags"));
+    }
 
     let mut real_name_to_og_name: AHashMap<String, String> = AHashMap::default();
     let mut props: Vec<String> = Vec::new();
-    if with_props {
-        for (friendly, internal) in prop_names.iter() {
-            props.push(internal.to_string());
-            real_name_to_og_name.insert(internal.to_string(), friendly.to_string());
-        }
+    for (friendly, internal) in prop_names.iter() {
+        props.push(internal.to_string());
+        real_name_to_og_name.insert(internal.to_string(), friendly.to_string());
     }
 
     let huf = create_huffman_lookup_table();
@@ -91,7 +106,7 @@ fn read_raw_inner(bytes: &[u8], with_props: bool) -> Result<Vec<RawEvent>> {
         wanted_prop_states: AHashMap::default(),
         wanted_events: events,
         wanted_ticks: vec![],
-        parse_ents: with_props,
+        parse_ents: tier <= 1,
         parse_projectiles: false,
         parse_grenades: false,
         parse_weapons: false,
@@ -129,16 +144,18 @@ fn read_raw_inner(bytes: &[u8], with_props: bool) -> Result<Vec<RawEvent>> {
 }
 
 fn read_raw(bytes: &[u8]) -> Result<Vec<RawEvent>> {
-    let first = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        read_raw_inner(bytes, true)
-    }));
-    match first {
-        Ok(Ok(v)) if !v.is_empty() => Ok(v),
-        _ => {
-            eprintln!("Свойства игроков не прочитались, разбираю без позиций и команд.");
-            read_raw_inner(bytes, false)
+    let mut last_err: Option<anyhow::Error> = None;
+    for tier in 0..3u8 {
+        let attempt = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            read_raw_inner(bytes, tier)
+        }));
+        match attempt {
+            Ok(Ok(v)) if !v.is_empty() => return Ok(v),
+            Ok(Err(e)) => last_err = Some(e),
+            _ => {}
         }
     }
+    Err(last_err.unwrap_or_else(|| anyhow::anyhow!("Парсер не смог прочитать демку")))
 }
 
 // ---------------------------------------------------------------------------
@@ -292,6 +309,8 @@ pub fn load_demo(bytes: &[u8]) -> Result<Demo> {
                         pitch: e.f("user_pitch"),
                         yaw: e.f("user_yaw"),
                         land: None,
+                        // 0 считаем «неизвестно»: у живого игрока флаги не бывают нулевыми.
+                        flags: e.oi("user_flags").filter(|f| *f != 0),
                     });
                 }
             }
